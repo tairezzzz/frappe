@@ -1,26 +1,39 @@
-version: "3"
+version: "3.5"
+
+x-erpnext-image: &erpnext_image
+  image: 89neuron/erpnext_hrms_payments:v15
+
+x-default-deploy: &default_deploy
+  deploy:
+    replicas: 1
+    placement:
+      constraints:
+        - node.labels.node-1 == true
+
+x-default-volumes: &default_volumes
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - logs:/home/frappe/frappe-bench/logs
 
 services:
   backend:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: on-failure
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
 
   configurator:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: none
     entrypoint:
       - bash
       - -c
-    # add redis_socketio for backward compatibility
     command:
       - >
         ls -1 apps > sites/apps.txt;
@@ -36,19 +49,16 @@ services:
       REDIS_CACHE: redis-cache:6379
       REDIS_QUEUE: redis-queue:6379
       SOCKETIO_PORT: "9000"
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
 
   create-site:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: none
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
     entrypoint:
       - bash
       - -c
@@ -70,17 +80,13 @@ services:
           fi
         done;
         echo "sites/common_site_config.json found";
-        bench new-site --no-mariadb-socket --admin-password=YQ8yPvBTdXVf3HEgnLA9Zt --db-root-password=YQ8yPvBTdXVf3HEgnLA9Zt --install-app erpnext --set-default frontend;
+        bench new-site --no-mariadb-socket --admin-password=${DB_PASSWORD} --db-root-password=${DB_PASSWORD} --install-app erpnext --set-default frontend;
         bench --site frontend install-app hrms;
         bench --site frontend install-app payments;
 
   db:
     image: mariadb:10.6
-    platform: linux/amd64
-    healthcheck:
-      test: mysqladmin ping -h localhost --password=YQ8yPvBTdXVf3HEgnLA9Zt
-      interval: 1s
-      retries: 15
+    <<: *default_deploy
     deploy:
       restart_policy:
         condition: on-failure
@@ -88,17 +94,16 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --skip-character-set-client-handshake
-      - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
+      - --skip-innodb-read-only-compressed
     environment:
-      MYSQL_ROOT_PASSWORD: YQ8yPvBTdXVf3HEgnLA9Zt
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
-    depends_on:
-      - websocket
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: on-failure
@@ -113,15 +118,13 @@ services:
       UPSTREAM_REAL_IP_RECURSIVE: "off"
       PROXY_READ_TIMEOUT: 120
       CLIENT_MAX_BODY_SIZE: 50m
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
     ports:
       - "8080:8080"
 
   queue-long:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: on-failure
@@ -130,13 +133,11 @@ services:
       - worker
       - --queue
       - long,default,short
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
 
   queue-short:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: on-failure
@@ -145,13 +146,10 @@ services:
       - worker
       - --queue
       - short,default
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
 
   redis-queue:
     image: redis:6.2-alpine
-    platform: linux/amd64
+    <<: *default_deploy
     deploy:
       restart_policy:
         condition: on-failure
@@ -160,7 +158,7 @@ services:
 
   redis-cache:
     image: redis:6.2-alpine
-    platform: linux/amd64
+    <<: *default_deploy
     deploy:
       restart_policy:
         condition: on-failure
@@ -168,30 +166,26 @@ services:
       - redis-cache-data:/data
 
   scheduler:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: on-failure
     command:
       - bench
       - schedule
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    <<: *erpnext_image
+    <<: *default_deploy
+    <<: *default_volumes
     deploy:
       restart_policy:
         condition: on-failure
     command:
       - node
       - /home/frappe/frappe-bench/apps/frappe/socketio.js
-    volumes:
-      - sites:/home/frappe/frappe-bench/sites
-      - logs:/home/frappe/frappe-bench/logs
 
 volumes:
   db-data:
