@@ -3,7 +3,6 @@ version: "3"
 services:
   backend:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -13,7 +12,6 @@ services:
 
   configurator:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: none
@@ -42,13 +40,16 @@ services:
 
   create-site:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
+    env_file:
+      - .env
     deploy:
       restart_policy:
         condition: none
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD}
     entrypoint:
       - bash
       - -c
@@ -70,15 +71,16 @@ services:
           fi
         done;
         echo "sites/common_site_config.json found";
-        bench new-site --no-mariadb-socket --admin-password=YQ8yPvBTdXVf3HEgnLA9Zt --db-root-password=YQ8yPvBTdXVf3HEgnLA9Zt --install-app erpnext --set-default frontend;
+        bench new-site --no-mariadb-socket --admin-password=${DB_PASSWORD} --db-root-password=${DB_PASSWORD} --install-app erpnext --set-default frontend;
         bench --site frontend install-app hrms;
         bench --site frontend install-app payments;
 
   db:
     image: mariadb:10.6
-    platform: linux/amd64
+    env_file:
+      - .env
     healthcheck:
-      test: mysqladmin ping -h localhost --password=YQ8yPvBTdXVf3HEgnLA9Zt
+      test: mysqladmin ping -h localhost --password=${DB_PASSWORD}
       interval: 1s
       retries: 15
     deploy:
@@ -90,13 +92,12 @@ services:
       - --skip-character-set-client-handshake
       - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
     environment:
-      MYSQL_ROOT_PASSWORD: YQ8yPvBTdXVf3HEgnLA9Zt
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db-data:/var/lib/mysql
 
   frontend:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     depends_on:
       - websocket
     deploy:
@@ -121,7 +122,6 @@ services:
 
   queue-long:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -136,7 +136,6 @@ services:
 
   queue-short:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -151,7 +150,6 @@ services:
 
   redis-queue:
     image: redis:6.2-alpine
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -160,7 +158,6 @@ services:
 
   redis-cache:
     image: redis:6.2-alpine
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -169,7 +166,6 @@ services:
 
   scheduler:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -182,7 +178,6 @@ services:
 
   websocket:
     image: 89neuron/erpnext_hrms_payments:v15
-    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
